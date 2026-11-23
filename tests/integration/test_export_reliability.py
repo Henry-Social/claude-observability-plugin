@@ -230,6 +230,28 @@ def test_confirm_export_fails_when_flush_hangs(hook_module, fresh_ledger):
         release.set()
 
 
+# ---- History cap ----
+def test_cap_history(hook_module):
+    msgs = [{"i": i} for i in range(10)]
+    assert hook_module.cap_history(msgs, limit=0) == msgs
+    assert hook_module.cap_history(msgs, limit=20) == msgs
+    assert hook_module.cap_history(msgs, limit=3) == [{"i": 7}, {"i": 8}, {"i": 9}]
+
+
+def test_history_cap_applies_to_generation_inputs(hook_module, fixture_transcript_path, fake_langfuse,
+                                                  isolated_hook_state, monkeypatch):
+    monkeypatch.setattr(hook_module, "HISTORY_MAX_MESSAGES", 1)
+    hook_module.emit_new_turns_from_transcript(
+        fake_langfuse, _config(hook_module), "sess", fixture_transcript_path("tool_turn"),
+        flush_deferred_agent_turns=True,
+    )
+    generations = [o for o in fake_langfuse.observations if o.as_type == "generation"]
+    assert generations
+    for g in generations:
+        if isinstance(g.kwargs.get("input"), list):
+            assert len(g.kwargs["input"]) <= 1
+
+
 # ---- Request splitting ----
 def test_split_into_requests(hook_module):
     sizes = {"a": 3, "b": 3, "c": 3, "big": 10, "huge": 100, "d": 1}

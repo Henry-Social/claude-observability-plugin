@@ -67,6 +67,21 @@ HARD_REQUEST_LIMIT_BYTES = 64 * 1024 * 1024
 # Set on the detached worker that SessionEnd hands its work to.
 DETACHED_WORKER_ENV = "CC_LANGFUSE_DETACHED_WORKER"
 
+# Keep at most this many trailing messages in each generation input
+# (0 = the whole conversation). Every LLM call carries the history so far, so
+# uncapped inputs grow quadratically with session length.
+try:
+    HISTORY_MAX_MESSAGES = max(0, int(_opt("CC_LANGFUSE_HISTORY_MAX_MESSAGES") or "0"))
+except ValueError:
+    HISTORY_MAX_MESSAGES = 0
+
+
+def cap_history(messages: List[Dict[str, Any]], limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    limit = HISTORY_MAX_MESSAGES if limit is None else limit
+    if limit <= 0 or len(messages) <= limit:
+        return list(messages)
+    return list(messages[-limit:])
+
 MAX_OPERATOR_TAGS = 20
 MAX_OPERATOR_TAG_CHARS = 200
 
@@ -3071,8 +3086,10 @@ def emit_turn_observations(langfuse: Langfuse, parent_otel_span: Any, turn: Turn
             ready_async_tool_results,
         )
         if history_messages is not None:
-            generation_kwargs["input"] = list(history_messages)
+            generation_kwargs["input"] = cap_history(history_messages)
             generation_kwargs["metadata"]["history"] = {"messages": len(history_messages)}
+            if len(generation_kwargs["input"]) < len(history_messages):
+                generation_kwargs["metadata"]["history"]["kept"] = len(generation_kwargs["input"])
         generation_start_timestamp = previous_timestamp or assistant_timestamp
         # A generation is only complete when its emitted form cannot change
         # anymore and its tool spans can ship with it: (a) every tool_use of
