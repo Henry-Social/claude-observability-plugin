@@ -71,7 +71,7 @@ DETACHED_WORKER_ENV = "CC_LANGFUSE_DETACHED_WORKER"
 # (0 = the whole conversation). Every LLM call carries the history so far, so
 # uncapped inputs grow quadratically with session length.
 try:
-    HISTORY_MAX_MESSAGES = max(0, int(_opt("CC_LANGFUSE_HISTORY_MAX_MESSAGES") or "0"))
+    HISTORY_MAX_MESSAGES = max(0, int(_opt("CC_LANGFUSE_HISTORY_MAX_MESSAGES") or "50"))
 except ValueError:
     HISTORY_MAX_MESSAGES = 0
 
